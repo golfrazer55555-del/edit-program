@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>싹둑 영상 편집기</title>
+<meta name="description" content="설치 없이 브라우저에서 영상을 자르고, 붙이고, 자막과 음악을 넣어 MP4/WebM으로 내보내는 영상 편집기">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gaegu:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Jua&family=Nanum+Myeongjo:wght@400;700;800&family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;700;900&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand" aria-label="싹둑 영상 편집기">
+      <span class="brand-mark" data-icon="scissors"></span>
+      <span class="brand-name">싹둑</span>
+      <span class="brand-sub">영상 편집기</span>
+    </div>
+    <label class="proj-name" for="projName">
+      <span class="sr-only">프로젝트 이름</span>
+      <input id="projName" type="text" maxlength="60" spellcheck="false" autocomplete="off">
+    </label>
+    <span class="save-state" id="saveState" aria-live="polite"></span>
+    <div class="topbar-spacer"></div>
+    <div class="btn-group">
+      <button class="icon-btn" id="btnUndo" type="button" data-icon="undo" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소"></button>
+      <button class="icon-btn" id="btnRedo" type="button" data-icon="redo" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행"></button>
+    </div>
+    <button class="btn ghost hide-sm" id="btnNew" type="button" data-icon="fileNew">새 프로젝트</button>
+    <button class="icon-btn" id="btnHelp" type="button" data-icon="help" title="도움말·단축키 (?)" aria-label="도움말"></button>
+    <button class="btn primary" id="btnExport" type="button" data-icon="download">내보내기</button>
+  </header>
+
+  <nav class="panel-tabs" id="panelTabs" role="tablist" aria-label="패널">
+    <button type="button" role="tab" id="tabMedia" aria-selected="true" aria-controls="panelMedia">미디어</button>
+    <button type="button" role="tab" id="tabInspector" aria-selected="false" aria-controls="panelInspector">속성</button>
+  </nav>
+
+  <aside class="panel panel-media" id="panelMedia" aria-label="미디어">
+    <div class="panel-head">
+      <h2>미디어</h2>
+      <button class="btn small primary" id="btnImport" type="button" data-icon="upload">가져오기</button>
+    </div>
+    <div class="panel-scroll">
+      <div class="media-list" id="mediaList"></div>
+      <section class="panel-section">
+        <h3>텍스트</h3>
+        <div class="preset-grid">
+          <button type="button" class="preset" data-text-preset="title"><span class="preset-sample t-title">제목</span><span class="preset-label">큰 제목</span></button>
+          <button type="button" class="preset" data-text-preset="subtitle"><span class="preset-sample t-sub">자막</span><span class="preset-label">하단 자막</span></button>
+          <button type="button" class="preset" data-text-preset="highlight"><span class="preset-sample t-hl">강조</span><span class="preset-label">강조 문구</span></button>
+        </div>
+        <button class="btn small ghost wide" id="btnSrt" type="button" data-icon="subtitle">자막 파일(.srt) 불러오기</button>
+      </section>
+      <section class="panel-section">
+        <h3>배경</h3>
+        <button class="btn small ghost wide" id="btnColorClip" type="button" data-icon="square">단색 화면 추가</button>
+      </section>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="viewer" id="viewer">
+      <canvas id="previewCanvas" aria-label="미리보기 화면"></canvas>
+    </div>
+    <div class="transport">
+      <div class="tc" aria-label="재생 위치">
+        <span id="tcCur">00:00:00:00</span><span class="tc-sep">/</span><span id="tcDur">00:00:00:00</span>
+      </div>
+      <div class="transport-btns">
+        <button class="icon-btn" id="btnStart" type="button" data-icon="skipStart" title="처음으로 (Home)" aria-label="처음으로"></button>
+        <button class="icon-btn" id="btnPrevFrame" type="button" data-icon="framePrev" title="이전 프레임 (←)" aria-label="이전 프레임"></button>
+        <button class="icon-btn play" id="btnPlay" type="button" data-icon="play" title="재생 / 일시정지 (Space)" aria-label="재생"></button>
+        <button class="icon-btn" id="btnNextFrame" type="button" data-icon="frameNext" title="다음 프레임 (→)" aria-label="다음 프레임"></button>
+        <button class="icon-btn" id="btnEnd" type="button" data-icon="skipEnd" title="끝으로 (End)" aria-label="끝으로"></button>
+      </div>
+      <div class="transport-right">
+        <button class="icon-btn" id="btnSafe" type="button" data-icon="safe" aria-pressed="false" title="안전 영역 표시" aria-label="안전 영역 표시"></button>
+        <div class="vol">
+          <button class="icon-btn" id="btnMute" type="button" data-icon="volume" title="미리보기 소리 켜기/끄기" aria-label="미리보기 소리"></button>
+          <input type="range" id="monitorVol" min="0" max="1" step="0.01" value="1" aria-label="미리보기 볼륨">
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel panel-inspector" id="panelInspector" aria-label="속성">
+    <div class="panel-head">
+      <h2 id="inspTitle">프로젝트</h2>
+      <span class="insp-kind" id="inspKind"></span>
+    </div>
+    <div class="panel-scroll" id="inspBody"></div>
+  </aside>
+
+  <section class="timeline" id="timeline" aria-label="타임라인">
+    <div class="tl-resizer" id="tlResizer" title="드래그해서 타임라인 높이 조절" aria-hidden="true"></div>
+    <div class="tl-toolbar">
+      <button class="btn small" id="btnSplit" type="button" data-icon="scissors" title="재생헤드 위치에서 자르기 (S)">분할</button>
+      <button class="btn small" id="btnDelete" type="button" data-icon="trash" title="선택한 클립 삭제 (Delete)">삭제</button>
+      <button class="btn small hide-xs" id="btnDuplicate" type="button" data-icon="copy" title="선택한 클립 복제 (Ctrl+D)">복제</button>
+      <span class="tl-divider" aria-hidden="true"></span>
+      <button class="btn small toggle" id="btnSnap" type="button" data-icon="magnet" aria-pressed="true" title="클립 끝·재생헤드에 자석처럼 붙이기">자석</button>
+      <div class="tl-spacer"></div>
+      <span class="tl-zoom-label hide-xs" id="zoomLabel"></span>
+      <button class="icon-btn small" id="btnZoomOut" type="button" data-icon="minus" title="축소 (-)" aria-label="타임라인 축소"></button>
+      <input type="range" id="zoomRange" min="0" max="1000" value="500" aria-label="타임라인 확대/축소">
+      <button class="icon-btn small" id="btnZoomIn" type="button" data-icon="plus" title="확대 (+)" aria-label="타임라인 확대"></button>
+      <button class="icon-btn small" id="btnZoomFit" type="button" data-icon="fit" title="전체 보기 (\)" aria-label="전체 보기"></button>
+    </div>
+    <div class="tl-body" id="tlBody">
+      <div class="tl-corner"></div>
+      <div class="tl-ruler-wrap" id="tlRulerWrap">
+        <canvas id="tlRuler"></canvas>
+        <div class="tl-ruler-head" id="tlRulerHead"></div>
+      </div>
+      <div class="tl-heads" id="tlHeads"></div>
+      <div class="tl-scroll" id="tlScroll">
+        <div class="tl-content" id="tlContent">
+          <div class="tl-rows" id="tlRows"></div>
+          <div class="tl-snap" id="tlSnap" hidden></div>
+          <div class="tl-insert" id="tlInsert" hidden></div>
+          <div class="tl-playhead" id="tlPlayhead"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="media-host" id="mediaHost" aria-hidden="true"></div>
+<div class="drop-overlay" id="dropOverlay" hidden><div class="drop-card"><span data-icon="upload"></span><strong>놓으면 가져옵니다</strong><span>영상 · 사진 · 음악 · 자막(.srt)</span></div></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div class="modal-root" id="modalRoot"></div>
+<input type="file" id="fileInput" multiple accept="video/*,audio/*,image/*,.mkv,.mov,.m4a,.srt,.vtt" hidden>
+<input type="file" id="srtInput" accept=".srt,.vtt,text/plain" hidden>
+
+<script src="js/util.js"></script>
+<script src="js/store.js"></script>
+<script src="js/media.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/library.js"></script>
+<script src="js/exporter.js"></script>
+<script src="js/persist.js"></script>
+<script src="js/sample.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
